@@ -1,0 +1,26 @@
+{
+  "name": "@secureshare/api",
+  "version": "2.0.0",
+  "private": true,
+  "description": "SecureShare file API: accounts, ciphertext storage, policy-gated downloads, audit log. Never sees plaintext or keys.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@secureshare/crypto": "2.0.0",
+    "@secureshare/server-common": "2.0.0",
+    "argon2": "^0.45.2",
+    "express": "^5.2.1",
+    "jose": "^6.2.18",
+    "mongoose": "^9.6.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2",
+    "vitest": "^5.1.1"
+  }
+}

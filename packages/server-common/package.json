@@ -1,0 +1,19 @@
+{
+  "name": "@secureshare/server-common",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Security middleware, config, logging and session verification shared by the SecureShare services.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express-rate-limit": "^8.3.0",
+    "helmet": "^8.1.0",
+    "jose": "^6.2.18",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@secureshare/crypto",
+  "version": "2.0.0",
+  "private": true,
+  "description": "SecureShare cryptography: FAME CP-ABE on BLS12-381, chunked AES-256-GCM, ECIES, ECDSA manifests, password-derived key vault. Runs in browsers and Node >= 22.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./policy": "./src/abe/policy.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^5.1.1"
+  }
+}

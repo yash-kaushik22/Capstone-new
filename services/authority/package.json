@@ -1,0 +1,24 @@
+{
+  "name": "@secureshare/authority",
+  "version": "2.0.0",
+  "private": true,
+  "description": "SecureShare attribute authority: holds the CP-ABE master key and issues attribute keys sealed to each user's device key.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@secureshare/crypto": "2.0.0",
+    "@secureshare/server-common": "2.0.0",
+    "express": "^5.2.1",
+    "mongoose": "^9.6.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2",
+    "vitest": "^5.1.1"
+  }
+}

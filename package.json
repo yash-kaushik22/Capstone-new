@@ -1,0 +1,41 @@
+{
+  "name": "secureshare",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Secure file sharing with ciphertext-policy attribute-based encryption (CP-ABE) and end-to-end encryption.",
+  "type": "module",
+  "workspaces": [
+    "packages/crypto",
+    "packages/server-common",
+    "services/authority",
+    "services/api",
+    "client"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "setup": "node scripts/gen-secrets.mjs",
+    "dev": "concurrently -k -n authority,api,client -c magenta,blue,green \"npm:dev:authority\" \"npm:dev:api\" \"npm:dev:client\"",
+    "dev:authority": "node --env-file=.env --watch services/authority/src/index.js",
+    "dev:api": "node --env-file=.env --watch services/api/src/index.js",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w client",
+    "lint": "eslint .",
+    "test": "npm run test:crypto && npm run test:authority && npm run test:api && npm run test:client",
+    "test:crypto": "npm test -w packages/crypto",
+    "test:authority": "npm test -w services/authority",
+    "test:api": "npm test -w services/api",
+    "test:client": "npm test -w client",
+    "smoke": "node scripts/smoke.mjs",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.7",
+    "eslint": "^10.0.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.4.0",
+    "mongodb-memory-server": "^11.3.0"
+  }
+}

@@ -1,0 +1,141 @@
+# SecureShare production stack.
+#   npm run setup                         # once: creates ./secrets
+#   cp deploy/.env.example deploy/.env    # set DOMAIN etc.
+#   docker compose --env-file deploy/.env up -d --build      # build locally, or
+#   docker compose --env-file deploy/.env pull && ... up -d  # use CI-built images
+#
+# Network layout: only `web` (Caddy) publishes ports. MongoDB and the authority's
+# internal port sit on the `backend` network, which has no route to the outside.
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  tmpfs:
+    - /tmp:size=16m,mode=1777
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  web:
+    <<: *hardening
+    image: ${IMAGE_PREFIX:-ghcr.io/your-org/secureshare}-web:${TAG:-latest}
+    build: { context: ., dockerfile: deploy/docker/web.Dockerfile }
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [frontend]
+    depends_on:
+      api: { condition: service_healthy }
+      authority: { condition: service_healthy }
+    deploy:
+      resources: { limits: { memory: 256m, pids: 200 } }
+
+  api:
+    <<: *hardening
+    image: ${IMAGE_PREFIX:-ghcr.io/your-org/secureshare}-api:${TAG:-latest}
+    build: { context: ., dockerfile: deploy/docker/service.Dockerfile, args: { SERVICE: api } }
+    environment:
+      PORT: "4000"
+      MONGODB_URI: mongodb://secureshare_api@mongo:27017/secureshare?authSource=secureshare
+      MONGODB_PASSWORD_FILE: /run/secrets/mongo_api_password
+      STORAGE_DIR: /data/blobs
+      PUBLIC_ORIGIN: https://${DOMAIN:-localhost}
+      COOKIE_SECURE: "true"
+      TRUST_PROXY_HOPS: "1"
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-104857600}
+      BOOTSTRAP_ADMIN: ${BOOTSTRAP_ADMIN:-admin}
+      REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
+      AUTHORITY_INTERNAL_URL: http://authority:7001
+      JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private.pem
+      JWT_PUBLIC_KEY_FILE: /run/secrets/jwt_public.pem
+      INTERNAL_TOKEN_FILE: /run/secrets/internal_token
+      SERVER_SECRET_FILE: /run/secrets/server_secret
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    secrets: [mongo_api_password, jwt_private.pem, jwt_public.pem, internal_token, server_secret]
+    volumes:
+      - blobs:/data/blobs
+    networks: [frontend, backend]
+    depends_on:
+      mongo: { condition: service_healthy }
+      authority: { condition: service_healthy }
+    deploy:
+      resources: { limits: { memory: 768m, pids: 200 } }
+
+  authority:
+    <<: *hardening
+    image: ${IMAGE_PREFIX:-ghcr.io/your-org/secureshare}-authority:${TAG:-latest}
+    build: { context: ., dockerfile: deploy/docker/service.Dockerfile, args: { SERVICE: authority } }
+    environment:
+      AUTHORITY_PORT: "7000"
+      AUTHORITY_INTERNAL_PORT: "7001"
+      AUTHORITY_MONGODB_URI: mongodb://secureshare_authority@mongo:27017/secureshare_authority?authSource=secureshare_authority
+      AUTHORITY_MONGODB_PASSWORD_FILE: /run/secrets/mongo_authority_password
+      PUBLIC_ORIGIN: https://${DOMAIN:-localhost}
+      COOKIE_SECURE: "true"
+      TRUST_PROXY_HOPS: "1"
+      AUTHORITY_KEK_FILE: /run/secrets/authority_kek
+      JWT_PUBLIC_KEY_FILE: /run/secrets/jwt_public.pem
+      INTERNAL_TOKEN_FILE: /run/secrets/internal_token
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    secrets: [mongo_authority_password, authority_kek, jwt_public.pem, internal_token]
+    networks: [frontend, backend]
+    depends_on:
+      mongo: { condition: service_healthy }
+    deploy:
+      resources: { limits: { memory: 512m, pids: 200 } }
+
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    command: ["--auth", "--bind_ip_all"]
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+    secrets: [mongo_root_password, mongo_api_password, mongo_authority_password]
+    volumes:
+      - mongo_data:/data/db
+      - ./deploy/mongo/init-users.js:/docker-entrypoint-initdb.d/10-users.js:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources: { limits: { memory: 1g, pids: 500 } }
+
+networks:
+  frontend: {}
+  backend:
+    internal: true
+
+volumes:
+  blobs: {}
+  mongo_data: {}
+  caddy_data: {}
+  caddy_config: {}
+
+secrets:
+  jwt_private.pem: { file: ./secrets/jwt_private.pem }
+  jwt_public.pem: { file: ./secrets/jwt_public.pem }
+  authority_kek: { file: ./secrets/authority_kek }
+  internal_token: { file: ./secrets/internal_token }
+  server_secret: { file: ./secrets/server_secret }
+  mongo_root_password: { file: ./secrets/mongo_root_password }
+  mongo_api_password: { file: ./secrets/mongo_api_password }
+  mongo_authority_password: { file: ./secrets/mongo_authority_password }
